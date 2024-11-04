@@ -1,0 +1,239 @@
+---
+title: "PAC1"
+author: "Marta Casas Vilaseca"
+date: "2024-10-29"
+output: html_document
+---
+# Exercici 1
+Primerament es clona el repositori de github a l'ordinador. 
+Ens assegurem que només es cloni una vegada, evitant que ens surti error cada vegada que generem el fitxer amb RMarkdown.
+```{r, cache=TRUE}
+library("git2r")
+url_metaboData <- "https://github.com/nutrimetabolomics/metaboData.git"
+ruta_meatboData <- "~/Git_BiB/metaboData"
+if (!dir.exists(ruta_meatboData)) {
+  metaboData <- git2r::clone(url_metaboData, ruta_meatboData)
+} else {
+  message("El repositori ja està clonat en: ", ruta_meatboData)
+}
+```
+Seguidemant s'instal·la el paquet SummarizedExperiment.
+Mitjançant message=FALSE i warning=FALSE, evitem que surti el missatge quan carreguem el paquet, ja que és molt llarg i no ens proporciona informaicó. 
+```{r, message=FALSE, warning=FALSE}
+if(!require("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+
+BiocManager::install("SummarizedExperiment")
+library(SummarizedExperiment)
+```
+Es llegeix l'excel que conté les dades i es transposa la matriu resultant per tal d'obtenir les mostres a les columnes i les característiques recollides a les files.
+També es llegeix la segona fulla de l'excel, que conté informació sobre els metabolits de les files de count_gcancer.
+```{r}
+library(readxl)
+count_gcancer <- t(read_excel("~/Git_BiB/metaboData/Datasets/2023-CIMCBTutorial/GastricCancer_NMR.xlsx"))
+metabolits_metadata_gcancer <- as.data.frame(read_excel("~/Git_BiB/metaboData/Datasets/2023-CIMCBTutorial/GastricCancer_NMR.xlsx", sheet = 2))
+```
+Inspeccionant les dades, es veu que les primeres quatre files de count_gcancer no contenen informació pròpia dels resultats de l'experiment. La primera fila no conté cap informació útil, la segona correspon als noms de les mostres i les dues següents contenen una descripció d'aquestes. Així doncs, s'utiliza la segona fila per donar nom a les columnes, s'extreuen aquestes quatre primeres files de la matriu count_gcancer i es guarden les que interessen en un nou DataFrame que anomenem sample_metadata_gcancer. 
+```{r}
+sample_metadata_gcancer <- t(count_gcancer[3:4, ])
+rownames(sample_metadata_gcancer) <- count_gcancer[2,]
+colnames(count_gcancer) <- count_gcancer[2,]
+count_gcancer <- count_gcancer[-(1:4), ]
+```
+Per tal de poder agrupar el DataFrame en l'objecte SummarizedExperiment, és necessari que les columnes d'aquest i les files del DataFrame coincideixin. Per aquest motiu, s'ha transposat el DataFrame a l'hora de crear-lo. 
+
+A més a més, també interessa utilitzar les dades de la segona fulla del mateix excel, que hem anomenat metabolits_metadata_gcancer. En aquest DataFrame s'hi troba la descripció dels metabolits, és a dir, de les files. S'ha vist que la primera columna no aporta informació, així que s'elimina; igual que la segona, que una vegada s'utilitza per definir els noms de les files la informació que aporta és repetida. 
+```{r}
+rownames(metabolits_metadata_gcancer) <- metabolits_metadata_gcancer$Name
+metabolits_metadata_gcancer <- metabolits_metadata_gcancer[, -(1:2)]
+```
+
+Finalment, es crea un objecte SummarizedExperiment on guardem la matriu count_gcancer a la llista counts. Si tinguessim més d'un assay seria possible guardar-lo també en la mateixa llista. També hi guardem les metadades de les columnes (mostres) i de les files (metabolits). 
+```{r}
+se_gcancer <- SummarizedExperiment(
+  assays = list(counts = count_gcancer),
+  colData = sample_metadata_gcancer, 
+  rowData = metabolits_metadata_gcancer)
+se_gcancer
+```
+El resum de l'objecte SummarizedExperiment ens indica que tenim un únic assay anomenat count_gcancer que conté informació de `r nrow(assay(se_gcancer))` característiques (metabolits) de `r ncol(assay(se_gcancer))` mostres. També es pot veure que tenim `r ncol(rowData(se_gcancer))` metadades pels metabolits (files) i `r ncol(colData(se_gcancer))`, per les mostres (columnes). 
+
+## Exportat de dades
+Un cop tenim l'objecte SummarizedExperiment creat, creem un directori i el guardem en format binari d'R, és a dir, amb extensió .Rda, igual que les metadades de les mostres i de les variables. 
+```{r}
+R_objectes_path <- "~/OneDrive - UAB/Documentos/Bioinformàtica i bioestadística/Anàlisi de dades òmiques/Repte 1. Les òmiques/R/R_objectes"
+if (!dir.exists(R_objectes_path)) {
+  dir.create(R_objectes_path)
+} else {
+  message("El directori ja existeix.")
+}
+
+save(se_gcancer, file = "~/OneDrive - UAB/Documentos/Bioinformàtica i bioestadística/Anàlisi de dades òmiques/Repte 1. Les òmiques/R/R_objectes/se_gcancer.Rda")
+save(metabolits_metadata_gcancer, file = "~/OneDrive - UAB/Documentos/Bioinformàtica i bioestadística/Anàlisi de dades òmiques/Repte 1. Les òmiques/R/R_objectes/metabolits_metadata_gcancer.Rda")
+save(sample_metadata_gcancer, file = "~/OneDrive - UAB/Documentos/Bioinformàtica i bioestadística/Anàlisi de dades òmiques/Repte 1. Les òmiques/R/R_objectes/sample_metadata_gcancer.Rda")
+```
+
+També ens interessa tenir les dades en format de text, pot ser en .txt o .csv. Així, exportem count_gcancer, sample_metadata_gcancer i metabolit_metadata_gcancer a aquests dos formats.
+```{r}
+write.table(count_gcancer, 
+            file = "count_gcancer.txt", 
+            quote = FALSE, 
+            sep = "\t", 
+            row.names = TRUE, 
+            col.names = TRUE)
+write.csv(count_gcancer, 
+          file = "count_gcancer.csv", 
+          quote = FALSE,
+          row.names = TRUE)
+
+write.table(metabolits_metadata_gcancer, 
+            file = "metabolits_metadata_gcancer.txt", 
+            quote = FALSE, 
+            sep = "\t", 
+            row.names = TRUE, 
+            col.names = TRUE)
+write.csv(metabolits_metadata_gcancer, 
+          file = "metabolits_metadata_gcancer.csv", 
+          quote = FALSE,
+          row.names = TRUE)
+
+write.table(sample_metadata_gcancer, 
+            file = "sample_metadata_gcancer.txt", 
+            quote = FALSE, 
+            sep = "\t", 
+            row.names = TRUE, 
+            col.names = TRUE)
+write.csv(sample_metadata_gcancer, 
+          file = "sample_metadata_gcancer.csv", 
+          quote = FALSE,
+          row.names = TRUE)
+```
+
+## Exploració de les dades
+
+#### Estructura de dades
+Es comença visualitzant les dades de l'assay i les metadades, tant de les mostres com dels metabolits, per fer-se una idea de com son i què represnten les dades. 
+```{r}
+se_gcancer
+head(assay(se_gcancer[,1:5]))
+rowData(se_gcancer)
+colData(se_gcancer)
+```
+Seguidament, es comproven el nombre de mostres i metabolits, i els noms de les mostres i les característiques mesurades.
+```{r}
+dim(se_gcancer)
+colnames(se_gcancer)
+rownames(se_gcancer)
+```
+#### Qualitat de les dades
+
+També es comprova si hi ha valors NA en la matriu de dades, ja que afecten la qualitat d'aquestes. 
+```{r}
+anyNA(assay(se_gcancer))
+```
+El resultat indica que sí que hi ha valors NA en la matriu de dades, per tant, s'investiga la quantitat i posició d'aquests. 
+```{r}
+NA_total <- nrow(which(is.na(assay(se_gcancer)), arr.ind = TRUE))
+NA_per_row <- rowSums(is.na(assay(se_gcancer)))
+NA_per_col <- colSums(is.na(assay(se_gcancer)))
+head(sort(NA_per_row, decreasing = TRUE))
+head(sort(NA_per_col, decreasing = TRUE))
+```
+S'obté el número total de NA en la matriu de dades: `r NA_total`. S'ordenen tant les mostres com els metabolits per ordre de NA, per detectar els més conflictius. 
+En explorar les dades, s'ha vist que en les metadades dels metabolits hi ha dos paràmetres relacionats amb la qualitat de cada metabolit recollit: `r colnames(metabolits_metadata_gcancer)[2]` i `r colnames(metabolits_metadata_gcancer)[3]`. 
+
+`r colnames(metabolits_metadata_gcancer)[2]` indica el percentatge de mostres que no conten mesura d'un metabolit concret. 
+
+`r colnames(metabolits_metadata_gcancer)[3]` és un valor de qualitat que representa la variació en mesuraments d'un metabolit concret per totes les mostres. 
+
+Per realitzar el control de qualitat s'eliminaran els metabolits que no compleixin el següent criteri: `r colnames(metabolits_metadata_gcancer)[2]` < 10% i `r colnames(metabolits_metadata_gcancer)[3]` < 20%.
+```{r}
+filtre_metabolits <- with(metabolits_metadata_gcancer, Perc_missing < 10 & QC_RSD < 20)
+f_metabolits_metadata_gcancer <- metabolits_metadata_gcancer[filtre_metabolits,]
+```
+Finalment, amb el filtratge de dades segons el criteri anterior, passem de tenir `r nrow(metabolits_metadata_gcancer)` a `r nrow(f_metabolits_metadata_gcancer)` metabolits.
+
+Abans de continuar, també s'actualitza la matriu de dades amb el filtratge de qualitat i es comprova que tingui el nombre de files esperat. 
+```{r}
+f_se_gcancer <- se_gcancer[filtre_metabolits]
+nrow(f_se_gcancer)
+```
+Guardem també aquest objecte SummarizedExperiment filtrat, igual que l'original.
+```{r}
+R_objectes_path <- "~/OneDrive - UAB/Documentos/Bioinformàtica i bioestadística/Anàlisi de dades òmiques/Repte 1. Les òmiques/R/R_objectes"
+if (!dir.exists(R_objectes_path)) {
+  dir.create(R_objectes_path)
+} else {
+  message("El directori ja existeix.")
+}
+
+save(f_se_gcancer, file = "~/OneDrive - UAB/Documentos/Bioinformàtica i bioestadística/Anàlisi de dades òmiques/Repte 1. Les òmiques/R/R_objectes/f_se_gcancer.Rda")
+```
+
+
+#### PCA 
+Abans de començar, instal·lem i carreguem els paquets necessàris per dur a terme l'anàlisi multivariant PCA. 
+```{r, message=FALSE, warning=FALSE}
+library(impute)
+if (!requireNamespace("pcaMethods", quietly = TRUE)) {
+  BiocManager::install("pcaMethods")
+}
+library(pcaMethods)
+library(ggplot2)
+```
+
+El filtratge de les dades o preprocessat ja s'ha dut a terme en l'apartat anterior. 
+
+Ara creem una variable numèrica que contingui les dades de l'experiment (assay), per tal de poder-les manipular més fàcilment. 
+```{r}
+num_assay <- apply(assay(f_se_gcancer), 2, function(x) as.numeric(x))
+rownames(num_assay) <- rownames(f_se_gcancer)
+```
+Primer de tot realitzem la transformació logarítmica (en base 10) de les dades de num_assay. L'objectiu és reduir la variabilitat de les mostres i controlar els valors extrems. 
+```{r}
+num_assay_log <- log10(num_assay)
+```
+Seguidament es centren i s'escalen les dades transformades logarítmicament. És a dir, per cada metabolit (variable) la mitjana es fa 0 i la desviació estàndard es fa 1. Aquest pas és molt important per l'anàlisi PCA per aconseguir que totes les variables contribueixin de manera comparable al càlcul dels PCs. 
+```{r}
+num_assay_log_scale <- scale(num_assay_log, center = TRUE, scale = TRUE)
+```
+A continuació s'imputen els valors NA restants després del filtratge amb l'algorisme k-Nearest Neighbors (kNN). S'utilitza la mitjana dels veïns més propers (en aquest cas els 3 veïns més propers, k=3) per completar les dades NA. 
+```{r}
+num_assay_knn <- impute.knn(num_assay_log_scale, k = 3)$data
+```
+Un cop tractades les dades i abans de passar a calcular l'anàlisi PCA, ens assegurem que les dimensions de les dades finals siguin les correctes:
+```{r}
+cat(sprintf("num_assay_knn: %d files i %d columnes\n", nrow(num_assay_knn), ncol(num_assay_knn)))
+```
+Una vegada estan preparades les dades, passem a calcular el PCA. S'utilitza el mètode de descomposició en valors singulars (svd) i s'extreuen les dues primeres components. Per adaptar les dades a la funció pca de R, es transposen per tal d'obtenir els metabolits a les columnes i les mostres a les files. 
+Finalment es crea un dataframe amb els PCs a les columnes i les mostres a les files.
+```{r}
+pca_result <- pca(t(num_assay_knn), method = "svd", nPcs = 10)
+pca_df <- data.frame(pca_result@scores)
+```
+A continuació s'analitzen els components principals calculats.
+```{r}
+v <- pca_result@R2
+v_acumul <- cumsum(v)
+cat("Variabilitat de cada component:", paste0("PC", 1:10, ": ", v), sep = "\n")
+cat("Variabilitat acumulativa en els components:", paste0("PC", 1:10, ": ", v_acumul), sep = "\n")
+```
+La major part de la variabilitat s'acumula en el `r colnames(pca_df)[1]` i `r colnames(pca_df)[2]`. Per tant, s'escullen aquests dos components per continuar amb l'anàlisi. Ara es calculen les càrregues de les variables dels dos components, el que  indica la contribució de cada metabolit en les dues components.
+```{r}
+carregues <- abs(pca_result@loadings[, 1:2])
+carregues_PC1 <- sort(carregues[,1], decreasing = TRUE)
+carregues_PC2 <- sort(carregues[,2], decreasing = TRUE)
+cat("Els metabolits amb major influència al PC1 son", names(head(carregues_PC1)), "\n")
+cat("Els metabolits amb major influència al PC2 son", names(head(carregues_PC2)))
+```
+L'anàlisi dels metabolits més contribuients en els components principals revela que M115 i M138 tenen una contribució significativa en ambdos components principals. 
+
+Per últim, creem el gràfic de dues dimensions amb els dos PCs als eixos. 
+```{r}
+group_label <- colData(f_se_gcancer)[,1]
+unique_groups <- unique(group_label)
+
+plot(pca_df$PC1, pca_df$PC2, col = as.factor(group_label), 
+     xlab = paste0("PC1 (", round((v[1]*100), 2), "%)"), ylab = paste0("PC2 (", round((v[2]*100), 2), "%)"), pch = 19, main = "Anàlisi PCA")
+legend("topright", legend = unique_groups, col = as.factor(group_label), pch = 19, title = "Grups")
+```
