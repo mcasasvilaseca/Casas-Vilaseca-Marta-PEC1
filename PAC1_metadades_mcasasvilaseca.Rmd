@@ -1,0 +1,26 @@
+---
+title: "Metadades"
+author: "Marta Casas Vilaseca"
+date: "2024-11-04"
+output: html_document
+---
+# Metadades PAC 1
+Es carrega el DataFrame amb les metadades dels metabolits i la matriu amb les metadades de les mostres. S'ha de canviar la ruta segons on s'hagi guardat l'arxiu. 
+```{r}
+R_objectes_path <- "~/OneDrive - UAB/Documentos/Bioinformàtica i bioestadística/Anàlisi de dades òmiques/Repte 1. Les òmiques/R/R_objectes"
+load(paste0(R_objectes_path, "/se_gcancer.Rda"))
+```
+També es carrega el paquet SummarizedExperiment per poder utilitzar les funcions colData i rowData. 
+```{r, warning=FALSE, message=FALSE}
+library(SummarizedExperiment)
+```
+
+## Metadades de les mostres
+```{r}
+as.data.frame(colData(se_gcancer))
+```
+## Metadades dels metabolits
+```{r}
+as.data.frame(rowData(se_gcancer))
+```
+
